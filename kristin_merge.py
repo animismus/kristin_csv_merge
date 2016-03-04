@@ -10,20 +10,19 @@ import csv
 # get current working directory for easy copy pasting of the script wherever it's necessary.
 kd_dir =  getcwd()
 kd_dir = "C:/Users/jofi0012.AD/Desktop/kb_merge"
+outfn = "concated"
 
-def main():
+def main(dk_dir = kd_dir):
     # keep a log list to print in the end
     log = []
-    count = 0
     # list of csv files
-    csvs = [x for x in listdir(kd_dir) if ".csv" in x]
-    # name for the first row naming scheme
-    fn_headers = [item.replace(".csv", "") for item in csvs]
+    csvs = [x for x in listdir(kd_dir) if ".csv" in x and not outfn in x]
     # holder for the actual final data 
     holder = []
+    # holder for the file names to insert in the output file, since there might empty files
     header_holder = []
     # start going through them
-    for item, fn_header in zip(csvs, fn_headers):
+    for item in csvs:
         # actual file name to scrape
         fn = join(kd_dir, item)
         
@@ -36,21 +35,20 @@ def main():
             log.append("File {} was empty, please re-check this <----".format(fn_header))
             continue
         
+        # if the file is not empty, then starting taking care of stuff
+        # add the file name to a header_holder
+        fn_header = item.replace(".csv", "")
         header_holder.append(fn_header)
         # check if the holder is still empty and if so, 
         if len(holder) == 0:
             # populate it for the first time
             holder = lines
-            # insert is a mutator method <---------------------
-#             holder.insert(0, ["", fn_header, "", "", ""])
-            # and create a compound index
+            # and create a compound index that will allow for easy tracking what line to append to
             cmpd_idx = {(line[0], line[1]): idx for idx, line in enumerate(holder)}
             log.append("File {} processed, ({} compounds)".format(fn_header, len(lines) - 1))
-            count += 1
-
             continue
             
-        # if the holder is not empty the, start adding stuff
+        # if the holder is not empty then start adding stuff
         else:
             # lines[0] is the header
             for line in lines[1:]:
@@ -60,25 +58,15 @@ def main():
                     holder[cmpd_idx[(line[0], line[1])]] += line[1:]
                 else:
                     # the new compound will ocupy a new place in the holder at the end
-                    # so the current lenght of the holder is new idx for that compound
+                    # so the current length of the holder is new idx for that compound
                     cmpd_idx[(line[0], line[1])] = len(holder)
                     # append the new compound at the end of the holder with the necessary padding
+                    # the padding is because previous files did not have it
                     holder.append([line[0], ] + ["" for i in range(4)] + line[1:])
                 
             log.append("File {} processed, ({} compounds)".format(fn_header, len(lines) - 1))
-            count += 1
 
-
-        # irrespective of new compound or not, add the headers
-        # file id header <----------------
-#         holder[0] += [fn_header, "", "", ""]
-        # column headers <--------------------------
-#         holder[1] += holder[1][-4:]
-
-        # check for lens after appends done
-        # pad to same lenght(if this file didn't have one or two compounds)
-#         for line in holder:
-#             line += ["" for _ in range(count*4 + 5 - len(line))]
+        # each time a file is processed, pad the lines to same length
         _max = max([len(l) for l in holder])
         for line in holder:
             line += ["" for _ in range(_max - len(line))]
@@ -91,18 +79,24 @@ def main():
     for fn_h in header_holder:
         file_headers += [fn_h, ] + ["" for _ in range(len(cols) - 1)]
     holder.insert(0, file_headers)
-#     ^^^^^^^^
-#     tou a usar os nomes dos ficheiros todos e alguns nao sao processados pk tao vazios
-#     se calhar fazer lista de fn_headers e depois entao processar tudo
     
-    
-    return holder
+    return holder, log
 
 
-# Num dos ficheiros há duas vezes o mm composto, mas com rts diferentes
-# for line in sorted(main(), key = lambda x: x[0]):
-concated = main()
-for line in concated:
-    print len(line), "\n", line, "\n"
-#     if line[-1] != "": print "^^^^^^^^^^^^^^^^^^^^"
+if __name__ == "__main__":
+    # get the list with the actual data
+    concated, log = main()
+    # save the list to csv
+    with open(kd_dir + "/{}.csv".format(outfn), 'wb') as fh:
+        csv.writer(fh, dialect="excel").writerows(concated)
+    # save the log file
+    log = "\n".join(log)
+    with open(kd_dir + "/{}_log.txt".format(outfn), 'wb') as fh:
+        fh.write(log)
 
+
+
+# DEBUG STUFF
+# print "\n".join(log)
+# print concated
+# print "\n".join([";".join(line) for line in concated])
