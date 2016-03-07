@@ -23,6 +23,7 @@ def idxer(line, index_on=index_on):
     return tuple([line[idx] for idx in index_on])
 
 def main(dk_dir = kd_dir, index_on = index_on):
+    cmpd_idx = {}
     # keep a log list to print in the end
     log = []
     # list of csv files
@@ -46,35 +47,25 @@ def main(dk_dir = kd_dir, index_on = index_on):
             continue
         
         # if the file is not empty, then starting taking care of stuff
-        # add the file name to a header_holder
+        # file header information
         fn_header = item.replace(".csv", "")
         header_holder.append(fn_header)
-        # check if the holder is still empty and if so, 
-        if len(holder) == 0:
-            # populate it for the first time
-            holder = lines
-            # and create a compound index that will allow for easy tracking what line to append to
-            cmpd_idx = {idxer(line): idx for idx, line in enumerate(holder)}
-            log.append("File {} processed, ({} compounds)".format(fn_header, len(lines) - 1))
-            continue
+
+        # going through the lines
+        for line in lines[1:]:
+            # check if the compound name (line[0]) is in the cmpd_index
+            # if it's there, just add to that like in the holder
+            if idxer(line) in cmpd_idx.keys():
+                holder[cmpd_idx[idxer(line)]] += line[1:]
+            else:
+                # the new compound will ocupy a new place in the holder at the end
+                # so the current length of the holder is new idx for that compound
+                cmpd_idx[idxer(line)] = len(holder)
+                # append the new compound at the end of the holder with the necessary padding
+                # the padding is because previous files did not have it
+                holder.append([line[0], ] + ["" for i in range(4)] + line[1:])
             
-        # if the holder is not empty then start adding stuff
-        else:
-            # lines[0] is the header
-            for line in lines[1:]:
-                # check if the compound name (line[0]) is in the cmpd_index
-                # if it's there, just add to that like in the holder
-                if idxer(line) in cmpd_idx.keys():
-                    holder[cmpd_idx[idxer(line)]] += line[1:]
-                else:
-                    # the new compound will ocupy a new place in the holder at the end
-                    # so the current length of the holder is new idx for that compound
-                    cmpd_idx[idxer(line)] = len(holder)
-                    # append the new compound at the end of the holder with the necessary padding
-                    # the padding is because previous files did not have it
-                    holder.append([line[0], ] + ["" for i in range(4)] + line[1:])
-                
-            log.append("File {} processed, ({} compounds)".format(fn_header, len(lines) - 1))
+        log.append("File {} processed, ({} compounds)".format(fn_header, len(lines) - 1))
 
         # each time a file is processed, pad the lines to same length
         _max = max([len(l) for l in holder])
