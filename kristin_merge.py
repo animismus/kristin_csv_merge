@@ -1,18 +1,28 @@
 # Kristin B. csv merge with pure py
-# JF    040316
-# Will be embedded with in a bat for easy handling (kristin_merge.bat)
+# JF    070316
+# Final script has to always be on kristin_merge.bat (embedded)
 
 from os import getcwd
 from os import listdir
 from os.path import join
 import csv
+import time
 
 # get current working directory for easy copy pasting of the script wherever it's necessary.
 kd_dir =  getcwd()
+# REMOVE WHEN USING FOR REAL
 kd_dir = "C:/Users/jofi0012.AD/Desktop/kb_merge"
+# What cols to use for matching
+# Name   R.T. (s)    Quant Masses    Area
+#  0        1           2              3
+index_on = [0]#,1]
 outfn = "concated"
 
-def main(dk_dir = kd_dir):
+
+def idxer(line, index_on=index_on):
+    return tuple([line[idx] for idx in index_on])
+
+def main(dk_dir = kd_dir, index_on = index_on):
     # keep a log list to print in the end
     log = []
     # list of csv files
@@ -44,7 +54,7 @@ def main(dk_dir = kd_dir):
             # populate it for the first time
             holder = lines
             # and create a compound index that will allow for easy tracking what line to append to
-            cmpd_idx = {(line[0], line[1]): idx for idx, line in enumerate(holder)}
+            cmpd_idx = {idxer(line): idx for idx, line in enumerate(holder)}
             log.append("File {} processed, ({} compounds)".format(fn_header, len(lines) - 1))
             continue
             
@@ -54,12 +64,12 @@ def main(dk_dir = kd_dir):
             for line in lines[1:]:
                 # check if the compound name (line[0]) is in the cmpd_index
                 # if it's there, just add to that like in the holder
-                if (line[0], line[1]) in cmpd_idx.keys():
-                    holder[cmpd_idx[(line[0], line[1])]] += line[1:]
+                if idxer(line) in cmpd_idx.keys():
+                    holder[cmpd_idx[idxer(line)]] += line[1:]
                 else:
                     # the new compound will ocupy a new place in the holder at the end
                     # so the current length of the holder is new idx for that compound
-                    cmpd_idx[(line[0], line[1])] = len(holder)
+                    cmpd_idx[idxer(line)] = len(holder)
                     # append the new compound at the end of the holder with the necessary padding
                     # the padding is because previous files did not have it
                     holder.append([line[0], ] + ["" for i in range(4)] + line[1:])
@@ -87,11 +97,12 @@ if __name__ == "__main__":
     # get the list with the actual data
     concated, log = main()
     # save the list to csv
-    with open(kd_dir + "/{}.csv".format(outfn), 'wb') as fh:
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    with open(kd_dir + "/{}_{}.csv".format(timestamp, outfn), 'wb') as fh:
         csv.writer(fh, dialect="excel").writerows(concated)
     # save the log file
     log = "\n".join(log)
-    with open(kd_dir + "/{}_log.txt".format(outfn), 'wb') as fh:
+    with open(kd_dir + "/{}_{}_log.txt".format(timestamp, outfn), 'wb') as fh:
         fh.write(log)
 
 
