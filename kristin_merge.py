@@ -32,7 +32,7 @@ kd_dir =  getcwd()
 # get current working directory for easy copy pasting of the script wherever it's necessary.
 # REMOVE WHEN USING FOR REAL 
 #^^^^^^^^^^^^^^^^^^^^<-------------------------------------------------------------
-kd_dir = "C:/Users/jofi0012.AD/Desktop/kb_merge"
+kd_dir = "C:/Users/jofi0012.AD/Desktop/kb_merge_2"
 
 def idxer(line, index_on=index_on):
     return tuple([line[idx] for idx in index_on])

@@ -1,18 +1,34 @@
 @SETLOCAL ENABLEDELAYEDEXPANSION & python -x "%~f0" %* & EXIT /B !ERRORLEVEL!
 
-# Kristin B. csv merge with pure py
-# JF    040316
-
 from os import getcwd
 from os import listdir
 from os.path import join
 import csv
+import time
 
-# get current working directory for easy copy pasting of the script wherever it's necessary.
-kd_dir =  getcwd()
+# What cols to use for matching, if you want to align on anything more than the name, 
+# add that columns name to list, e.g., aligning on Name + RT: index_on = [0, 1] 
+# at the moment it's jus the name
+# Name   R.T. (s)    Quant Masses    Area
+#  0        1           2              3
+index_on = [0]#,1]
+# Name of the output file, a timestamp is added for control only.
 outfn = "concated"
 
-def main(dk_dir = kd_dir):
+
+
+
+
+
+
+kd_dir =  getcwd()
+
+def idxer(line, index_on=index_on):
+    return tuple([line[idx] for idx in index_on])
+
+def main(dk_dir = kd_dir, index_on = index_on):
+    # start the cmpd index dict
+    cmpd_idx = {}
     # keep a log list to print in the end
     log = []
     # list of csv files
@@ -21,6 +37,9 @@ def main(dk_dir = kd_dir):
     holder = []
     # holder for the file names to insert in the output file, since there might empty files
     header_holder = []
+    header_idxs = []
+    # non empty file idx
+    fidx = 0
     # start going through them
     for item in csvs:
         # actual file name to scrape
@@ -36,35 +55,29 @@ def main(dk_dir = kd_dir):
             continue
         
         # if the file is not empty, then starting taking care of stuff
-        # add the file name to a header_holder
+        # file header information
         fn_header = item.replace(".csv", "")
         header_holder.append(fn_header)
-        # check if the holder is still empty and if so, 
-        if len(holder) == 0:
-            # populate it for the first time
-            holder = lines
-            # and create a compound index that will allow for easy tracking what line to append to
-            cmpd_idx = {(line[0], line[1]): idx for idx, line in enumerate(holder)}
-            log.append("File {} processed, ({} compounds)".format(fn_header, len(lines) - 1))
-            continue
-            
-        # if the holder is not empty then start adding stuff
-        else:
-            # lines[0] is the header
-            for line in lines[1:]:
-                # check if the compound name (line[0]) is in the cmpd_index
-                # if it's there, just add to that like in the holder
-                if (line[0], line[1]) in cmpd_idx.keys():
-                    holder[cmpd_idx[(line[0], line[1])]] += line[1:]
-                else:
-                    # the new compound will ocupy a new place in the holder at the end
-                    # so the current length of the holder is new idx for that compound
-                    cmpd_idx[(line[0], line[1])] = len(holder)
-                    # append the new compound at the end of the holder with the necessary padding
-                    # the padding is because previous files did not have it
-                    holder.append([line[0], ] + ["" for i in range(4)] + line[1:])
-                
-            log.append("File {} processed, ({} compounds)".format(fn_header, len(lines) - 1))
+
+        # going through the lines
+        for line in lines[1:]:
+            # check if the compound name (line[0]) is in the cmpd_index
+            # if it's there, just add to that like in the holder
+            if idxer(line) in cmpd_idx.keys():
+                holder[cmpd_idx[idxer(line)]] += line[1:]
+            else:
+                # the new compound will ocupy a new place in the holder at the end
+                # so the current length of the holder is new idx for that compound
+                cmpd_idx[idxer(line)] = len(holder)
+                # append the new compound at the end of the holder with the necessary padding
+                # the padding is because previous files did not have it
+                holder.append([line[0], ] + ["" for i in range(4 * fidx)] + line[1:])
+        log.append("File {} processed, ({} compounds)".format(fn_header, len(lines) - 1))
+
+        # increase the file index, for the new compounds positioning.
+        fidx += 1
+        # idx list for the headers
+        header_idxs.append(max([len(l) for l in holder]))
 
         # each time a file is processed, pad the lines to same length
         _max = max([len(l) for l in holder])
@@ -72,24 +85,28 @@ def main(dk_dir = kd_dir):
             line += ["" for _ in range(_max - len(line))]
             
     # making the col headers
+    final_l = len(holder[0])
     cols = ['R.T. (s)', 'Quant Masses', 'Area', 'Peak S/N']
-    holder[0] = ["Name", ] + cols * (len(holder[0]) // len(cols))
+    holder[0] = ["Name", ] + cols * ((final_l) // len(cols))
     # making the file name headers
-    file_headers = ["",]
-    for fn_h in header_holder:
-        file_headers += [fn_h, ] + ["" for _ in range(len(cols) - 1)]
+    file_headers = ["" for _ in range(final_l)]
+    for fn_h, fn_i in zip(header_holder, [1,] + header_idxs[:-1]):
+        file_headers[fn_i] = fn_h
+        # file_headers += [fn_h, ] + ["" for _ in range(len(cols) - 1)]
     holder.insert(0, file_headers)
-    
     return holder, log
 
 
 if __name__ == "__main__":
+    start = time.clock()
     # get the list with the actual data
     concated, log = main()
     # save the list to csv
-    with open(kd_dir + "/{}.csv".format(outfn), 'wb') as fh:
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    with open(kd_dir + "/{}_{}.csv".format(timestamp, outfn), 'wb') as fh:
         csv.writer(fh, dialect="excel").writerows(concated)
     # save the log file
+    log.append("Merging took {:.2f} seconds.".format(time.clock() - start))
     log = "\n".join(log)
-    with open(kd_dir + "/{}_log.txt".format(outfn), 'wb') as fh:
+    with open(kd_dir + "/{}_{}_log.txt".format(timestamp, outfn), 'wb') as fh:
         fh.write(log)
